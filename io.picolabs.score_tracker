@@ -1,0 +1,140 @@
+ruleset io.picolabs.score_tracker {
+  meta {
+    use module io.picolabs.cookies alias cookies
+    shares __testing, test, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName
+  }
+  global {
+    __testing = { "queries":
+      [ { "name": "__testing" }
+      , { "name": "test" },
+      { "name": "getScores" },
+      { "name": "totalPoints", "args": ["scoreTracker"] },
+      { "name": "nameTaken", "args": ["first", "last"] },
+      { "name": "infoFromName", "args": ["first", "last"] },
+      { "name": "cookieFromRecoveryCode", "args": ["recoveryCode"] }
+      ] , "events":
+      [ { "domain": "score", "type": "new_points", "attrs": ["points", "descr"] }
+      , { "domain": "score", "type": "new_participant", "attrs": ["first", "last"] }
+      ]
+    }
+
+    getScores = function() {
+      ent:scores.defaultsTo({})
+    }
+
+    totalPoints = function(scoreTracker) {
+      tracker = event:attr("scoreTracker") => event:attr("scoreTracker") | scoreTracker;
+      scores = getScores(){[tracker, "pointsArr"]};
+      scores => scores.reduce(function(counter, current){
+        counter + current{"points"}
+      }, 0) | -1 //-1 means this user is not registered...
+    }
+
+    test = function() {
+      {"someKey": [0, 1, 2, 3], "anotherKey": [4, 5, 6, 7]}.reduce(function(accum, v, k){v}, 10)
+    }
+
+    nameTaken = function(first, last) {
+      getScores().values().reduce(function(counter, current){
+        counter == true => true | (current{"first"} == first && current{"last"} == last => true | false)
+      }, false)
+    }
+
+    cookieFromRecoveryCode = function(recoveryCode) {
+      scores = getScores();
+      scores.keys().reduce(function(counter, cookieUUID){
+        currentRecoveryCode = scores{[cookieUUID, "recoveryCode"]};
+        counter => counter | (currentRecoveryCode == recoveryCode => cookieUUID | null)
+      }, null)
+    }
+
+    infoFromName = function(first, last) {
+      getScores().values().reduce(function(counter, current){
+        counter => counter | (current{"first"} == first && current{"last"} == last => current | false)
+      }, null)
+    }
+  }
+
+  /* ent:scores
+    {
+      <someUUID> :  {                     // the UUID is meant to be stored in a cookie on someone's device under the key, "scoreTracker"
+        first: <string>,
+        last: <string>,
+        recoveryCode: <random:uuid()>,    // accidentally cleared your cookies? talk to an admin to get your recovery code
+        pointsArr: [{
+          "timestamp": <time:now()>,
+          "points": <number>,
+          "descr": <string>},             //a description of the points earned
+        ...]
+      },
+      ...
+    }
+  */
+
+  rule addPoints {
+    select when score new_points
+    pre {
+      scoreTracker = cookies:cookies(){"scoreTracker"}
+      time = time:now()
+      points = event:attr("points").as("Number") //cast into a number just in case the attribute arrives as a string
+      descr = event:attr("descr")
+      newEntry = {
+        "timestamp": time,
+        "points": points,
+        "descr": descr
+      }
+    }
+    if not points.isnull() && descr && scoreTracker then
+      noop()
+    fired {
+      ent:scores{[scoreTracker, "pointsArr"]} := getScores(){[scoreTracker, "pointsArr"]}.append([newEntry])
+    } else {
+      raise score event "missing_attributes"
+        attributes event:attrs
+    }
+  }
+
+  rule reportMissing {
+    select when score missing_attributes
+    send_directive("Missing event attributes")
+  }
+
+  rule createCookie {
+    select when score new_participant
+    pre {
+      first = event:attr("first")
+      last = event:attr("last")
+      id = random:uuid()
+      taken = nameTaken(first, last)
+      recoveryCode = random:uuid()
+    }
+    if first && last && not taken then
+      send_directive("_cookie", {"cookie": <<scoreTracker=#{id};>>})
+    fired {
+      ent:scores{[id]} := {
+        "first": first,
+        "last": last,
+        "recoveryCode": recoveryCode,
+        "pointsArr": []
+      }
+    } else {
+      raise score event "name_taken"
+        attributes event:attrs if taken
+    }
+  }
+
+  rule nameTaken {
+    select when score name_taken
+    send_directive("Name already taken!")
+  }
+
+  rule recoverCookie {
+    select when score recovery_needed
+    pre {
+      recoveryCode = event:attr("recoveryCode")
+      cookie = cookieFromRecoveryCode(recoveryCode)
+    }
+    if cookie then
+      send_directive("_cookie", {"cookie": <<scoreTracker=#{cookie};>>})
+  }
+}
