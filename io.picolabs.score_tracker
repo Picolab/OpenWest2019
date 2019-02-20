@@ -12,10 +12,11 @@ ruleset io.picolabs.score_tracker {
       { "name": "totalPoints", "args": ["scoreTracker"] },
       { "name": "nameTaken", "args": ["first", "last"] },
       { "name": "infoFromName", "args": ["first", "last"] },
-      { "name": "cookieFromRecoveryCode", "args": ["recoveryCode"] }
+      { "name": "cookieFromRecoveryCode", "args": ["recoveryCode", "first", "last"] }
       ] , "events":
       [ { "domain": "score", "type": "new_points", "attrs": ["points", "descr"] }
-      , { "domain": "score", "type": "new_participant", "attrs": ["first", "last"] }
+      , { "domain": "score", "type": "new_participant", "attrs": ["first", "last"] },
+      { "domain": "score", "type": "recovery_needed", "attrs": ["recoveryCode", "first", "last"] }
       ]
     }
 
@@ -58,11 +59,13 @@ ruleset io.picolabs.score_tracker {
       }, false)
     }
 
-    cookieFromRecoveryCode = function(recoveryCode) {
+    cookieFromRecoveryCode = function(recoveryCode, first, last) {
       scores = getScores();
       scores.keys().reduce(function(counter, cookieUUID){
         currentRecoveryCode = scores{[cookieUUID, "recoveryCode"]};
-        counter => counter | (currentRecoveryCode == recoveryCode => cookieUUID | null)
+        currentFirst = scores{[cookieUUID, "first"]};
+        currentLast = scores{[cookieUUID, "last"]};
+        counter => counter | ((currentRecoveryCode == recoveryCode) && (first == currentFirst) && (last == currentLast) => cookieUUID | null)
       }, null)
     }
 
@@ -178,7 +181,9 @@ ruleset io.picolabs.score_tracker {
     select when score recovery_needed
     pre {
       recoveryCode = event:attr("recoveryCode")
-      cookie = cookieFromRecoveryCode(recoveryCode)
+      first = event:attr("first")
+      last = event:attr("last")
+      cookie = cookieFromRecoveryCode(recoveryCode, first, last)
     }
     if cookie then
       send_directive("_cookie", {"cookie": <<scoreTracker=#{cookie};>>})
