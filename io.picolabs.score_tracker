@@ -1,13 +1,14 @@
 ruleset io.picolabs.score_tracker {
   meta {
     use module io.picolabs.cookies alias cookies
-    shares __testing, test, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName
+    shares __testing, test, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks
   }
   global {
     __testing = { "queries":
       [ { "name": "__testing" }
       , { "name": "test" },
       { "name": "getScores" },
+      { "name": "currentRanks" },
       { "name": "totalPoints", "args": ["scoreTracker"] },
       { "name": "nameTaken", "args": ["first", "last"] },
       { "name": "infoFromName", "args": ["first", "last"] },
@@ -20,6 +21,23 @@ ruleset io.picolabs.score_tracker {
 
     getScores = function() {
       ent:scores.defaultsTo({})
+    }
+
+    //returns an array of maps, with the maps being ordered such that first place is first in the array. There is no deterministic order in case of ties, except that those of the same point value will be grouped together
+    currentRanks = function() {
+      //first, calculate the points for each participant
+      points = getScores().map(function(obj, scoreTracker) {
+        {
+          "first": obj{"first"},
+          "last": obj{"last"},
+          "points": totalPoints(scoreTracker)
+        }
+      });
+      //sort the participants by points
+      points.values().sort(function(a, b) {
+        a{"points"} < b {"points"} => 1 |
+          a{"points"} == b {"points"} => 0 | -1
+      })
     }
 
     totalPoints = function(scoreTracker) {
@@ -53,6 +71,17 @@ ruleset io.picolabs.score_tracker {
         counter => counter | (current{"first"} == first && current{"last"} == last => current | false)
       }, null)
     }
+
+    app = { "name":"Score Tracker", "version":"0.1" };
+
+    DID_Policy = {
+        "name": "only allow score events",
+        "event": {
+            "allow": [
+                { "domain": "score" }
+            ]
+        }
+    }
   }
 
   /* ent:scores
@@ -70,6 +99,23 @@ ruleset io.picolabs.score_tracker {
       ...
     }
   */
+
+  rule init {
+    select when wrangler ruleset_installed where rids >< meta:rid
+    every{
+      engine:newPolicy(DID_Policy) setting(registered_policy)
+      engine:newChannel(name="scoreTracker", type="scoreEvents", policy_id = registered_policy{"id"})
+    }
+  }
+
+  rule discovery {
+    select when manifold apps
+    send_directive("app discovered...",
+                            {
+                              "app": app,
+                              "iconURL": "https://image.flaticon.com/icons/svg/1162/1162481.svg"
+                            } );
+  }
 
   rule addPoints {
     select when score new_points
@@ -106,7 +152,7 @@ ruleset io.picolabs.score_tracker {
       last = event:attr("last")
       id = random:uuid()
       taken = nameTaken(first, last)
-      recoveryCode = random:uuid()
+      recoveryCode = random:integer(10000).as("String")
     }
     if first && last && not taken then
       send_directive("_cookie", {"cookie": <<scoreTracker=#{id};>>})
