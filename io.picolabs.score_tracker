@@ -19,11 +19,11 @@ ruleset io.picolabs.score_tracker {
       { "domain": "score", "type": "recovery_needed", "attrs": ["recoveryCode", "first", "last"] }
       ]
     }
-
+    
     getScores = function() {
       ent:scores.defaultsTo({})
     }
-
+    
     //returns an array of maps, with the maps being ordered such that first place is first in the array. There is no deterministic order in case of ties, except that those of the same point value will be grouped together
     currentRanks = function() {
       //first, calculate the points for each participant
@@ -40,7 +40,7 @@ ruleset io.picolabs.score_tracker {
           a{"points"} == b {"points"} => 0 | -1
       })
     }
-
+    
     totalPoints = function(scoreTracker) {
       tracker = event:attr("scoreTracker") => event:attr("scoreTracker") | scoreTracker;
       scores = getScores(){[tracker, "pointsArr"]};
@@ -48,17 +48,17 @@ ruleset io.picolabs.score_tracker {
         counter + current{"points"}
       }, 0) | -1 //-1 means this user is not registered...
     }
-
+    
     test = function() {
       {"someKey": [0, 1, 2, 3], "anotherKey": [4, 5, 6, 7]}.reduce(function(accum, v, k){v}, 10)
     }
-
+    
     nameTaken = function(first, last) {
       getScores().values().reduce(function(counter, current){
         counter == true => true | (current{"first"} == first && current{"last"} == last => true | false)
       }, false)
     }
-
+    
     cookieFromRecoveryCode = function(recoveryCode, first, last) {
       scores = getScores();
       scores.keys().reduce(function(counter, cookieUUID){
@@ -68,15 +68,15 @@ ruleset io.picolabs.score_tracker {
         counter => counter | ((currentRecoveryCode == recoveryCode) && (first == currentFirst) && (last == currentLast) => cookieUUID | null)
       }, null)
     }
-
+    
     infoFromName = function(first, last) {
       getScores().values().reduce(function(counter, current){
         counter => counter | (current{"first"} == first && current{"last"} == last => current | false)
       }, null)
     }
-
+    
     app = { "name":"Score Tracker", "version":"0.1" };
-
+    
     DID_Policy = {
         "name": "only allow score events",
         "event": {
@@ -86,12 +86,13 @@ ruleset io.picolabs.score_tracker {
         }
     }
   }
-
+  
   /* ent:scores
     {
       <someUUID> :  {                     // the UUID is meant to be stored in a cookie on someone's device under the key, "scoreTracker"
         first: <string>,
         last: <string>,
+        phoneNum: <string>,
         recoveryCode: <random:uuid()>,    // accidentally cleared your cookies? talk to an admin to get your recovery code
         pointsArr: [{
           "timestamp": <time:now()>,
@@ -102,7 +103,7 @@ ruleset io.picolabs.score_tracker {
       ...
     }
   */
-
+  
   rule init {
     select when wrangler ruleset_installed where rids >< meta:rid
     every{
@@ -110,7 +111,7 @@ ruleset io.picolabs.score_tracker {
       engine:newChannel(name="scoreTracker", type="scoreEvents", policy_id = registered_policy{"id"})
     }
   }
-
+  
   rule discovery {
     select when manifold apps
     send_directive("app discovered...",
@@ -119,7 +120,7 @@ ruleset io.picolabs.score_tracker {
                               "iconURL": "https://image.flaticon.com/icons/svg/1162/1162481.svg"
                             } );
   }
-
+  
   rule addPoints {
     select when score new_points
     pre {
@@ -142,27 +143,29 @@ ruleset io.picolabs.score_tracker {
         attributes event:attrs
     }
   }
-
+  
   rule reportMissing {
     select when score missing_attributes
     send_directive("Missing event attributes")
   }
-
+  
   rule createCookie {
     select when score new_participant
     pre {
       first = event:attr("first")
       last = event:attr("last")
+      phoneNum = event:attr("phoneNum")
       id = random:uuid()
       taken = nameTaken(first, last)
       recoveryCode = random:integer(10000).as("String")
     }
-    if first && last && not taken then
+    if first && last && phoneNum && not taken then
       send_directive("_cookie", {"cookie": <<scoreTracker=#{id};>>})
     fired {
       ent:scores{[id]} := {
         "first": first,
         "last": last,
+        "phoneNum": phoneNum,
         "recoveryCode": recoveryCode,
         "pointsArr": []
       }
@@ -171,12 +174,12 @@ ruleset io.picolabs.score_tracker {
         attributes event:attrs if taken
     }
   }
-
+  
   rule nameTaken {
     select when score name_taken
     send_directive("Name already taken!")
   }
-
+  
   rule recoverCookie {
     select when score recovery_needed
     pre {
