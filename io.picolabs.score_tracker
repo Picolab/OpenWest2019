@@ -15,7 +15,7 @@ ruleset io.picolabs.score_tracker {
       { "name": "cookieFromRecoveryCode", "args": ["recoveryCode", "first", "last"] }
       ] , "events":
       [ { "domain": "score", "type": "new_points", "attrs": ["points", "descr"] }
-      , { "domain": "score", "type": "new_participant", "attrs": ["first", "last"] },
+      , { "domain": "score", "type": "new_participant", "attrs": ["first", "last", "phoneNum"] },
       { "domain": "score", "type": "recovery_needed", "attrs": ["recoveryCode", "first", "last"] }
       ]
     }
@@ -124,7 +124,8 @@ ruleset io.picolabs.score_tracker {
   rule addPoints {
     select when score new_points
     pre {
-      scoreTracker = cookies:cookies(){"scoreTracker"}
+      cookieTracker = cookies:cookies(){"scoreTracker"}
+      scoreTracker = (cookieTracker) => cookieTracker | event:attr("scoreTracker")
       time = time:now()
       points = event:attr("points").as("Number") //cast into a number just in case the attribute arrives as a string
       descr = event:attr("descr")
@@ -160,7 +161,7 @@ ruleset io.picolabs.score_tracker {
       recoveryCode = random:integer(10000).as("String")
     }
     if first && last && phoneNum && not taken then
-      send_directive("_cookie", {"cookie": <<scoreTracker=#{id};>>})
+      send_directive("_cookie", {"cookie": <<scoreTracker=#{id}; Path=/>>})
     fired {
       ent:scores{[id]} := {
         "first": first,
@@ -189,6 +190,6 @@ ruleset io.picolabs.score_tracker {
       cookie = cookieFromRecoveryCode(recoveryCode, first, last)
     }
     if cookie then
-      send_directive("_cookie", {"cookie": <<scoreTracker=#{cookie};>>})
+      send_directive("_cookie", {"cookie": <<scoreTracker=#{cookie}; Path=/>>})
   }
 }
