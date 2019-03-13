@@ -1,15 +1,17 @@
 ruleset io.picolabs.score_tracker {
   meta {
     use module io.picolabs.cookies alias cookies
-    shares __testing, test, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks
+    shares __testing, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr
+    provides totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr
   }
   global {
     __testing = { "queries":
-      [ { "name": "__testing" }
-      , { "name": "test" },
+      [ { "name": "__testing" },
       { "name": "getScores" },
       { "name": "currentRanks" },
       { "name": "totalPoints", "args": ["scoreTracker"] },
+      {"name": "getPointsArr", "args": ["scoreTracker"] },
+      { "name": "nameFromScoreTracker", "args": ["scoreTracker"] },
       { "name": "nameTaken", "args": ["first", "last"] },
       { "name": "infoFromName", "args": ["first", "last"] },
       { "name": "cookieFromRecoveryCode", "args": ["recoveryCode", "first", "last"] }
@@ -49,14 +51,18 @@ ruleset io.picolabs.score_tracker {
       }, 0) | -1 //-1 means this user is not registered...
     }
     
-    test = function() {
-      {"someKey": [0, 1, 2, 3], "anotherKey": [4, 5, 6, 7]}.reduce(function(accum, v, k){v}, 10)
-    }
-    
     nameTaken = function(first, last) {
       getScores().values().reduce(function(counter, current){
         counter == true => true | (current{"first"} == first && current{"last"} == last => true | false)
       }, false)
+    }
+    
+    nameFromScoreTracker = function(scoreTracker) {
+      info = getScores(){[scoreTracker]};
+      {
+        "first": info{"first"},
+        "last": info{"last"}
+      }
     }
     
     cookieFromRecoveryCode = function(recoveryCode, first, last) {
@@ -69,10 +75,19 @@ ruleset io.picolabs.score_tracker {
       }, null)
     }
     
+    getPointsArr = function(scoreTracker) {
+      getScores(){[scoreTracker, "pointsArr"]}.defaultsTo([])
+    }
+    
     infoFromName = function(first, last) {
       getScores().values().reduce(function(counter, current){
         counter => counter | (current{"first"} == first && current{"last"} == last => current | false)
       }, null)
+    }
+    
+    getScoreTracker = function() {
+      cookieTracker = cookies:cookies(){"scoreTracker"};
+      (cookieTracker) => cookieTracker | event:attr("scoreTracker")
     }
     
     app = { "name":"Score Tracker", "version":"0.1" };
@@ -124,8 +139,7 @@ ruleset io.picolabs.score_tracker {
   rule addPoints {
     select when score new_points
     pre {
-      cookieTracker = cookies:cookies(){"scoreTracker"}
-      scoreTracker = (cookieTracker) => cookieTracker | event:attr("scoreTracker")
+      scoreTracker = getScoreTracker()
       time = time:now()
       points = event:attr("points").as("Number") //cast into a number just in case the attribute arrives as a string
       descr = event:attr("descr")
@@ -138,7 +152,9 @@ ruleset io.picolabs.score_tracker {
     if not points.isnull() && descr && scoreTracker then
       noop()
     fired {
-      ent:scores{[scoreTracker, "pointsArr"]} := getScores(){[scoreTracker, "pointsArr"]}.append([newEntry])
+      ent:scores{[scoreTracker, "pointsArr"]} := getScores(){[scoreTracker, "pointsArr"]}.append([newEntry]);
+      raise score event "points_added"
+        attributes newEntry.put("scoreTracker", scoreTracker)
     } else {
       raise score event "missing_attributes"
         attributes event:attrs
