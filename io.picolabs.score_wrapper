@@ -1,0 +1,94 @@
+ruleset io.picolabs.score_wrapper {
+  meta {
+    use module io.picolabs.score_tracker alias tracker
+    shares __testing, alreadyEarned
+  }
+  global {
+    __testing = { "queries":
+      [ { "name": "__testing" }
+      , { "name": "alreadyEarned", "args": [ "scoreTracker", "descr" ] }
+      ] , "events":
+      [ { "domain": "score_wrapper", "type": "new_points", "attrs": ["points", "descr"] }
+      //, { "domain": "d2", "type": "t2", "attrs": [ "a1", "a2" ] }
+      ]
+    }
+    
+    //if the currentTime is within five minutes of the given toCheck time, then return true, else false
+    checkTimestamps = function(currentTime, toCheck) {
+      newTime = time:add(toCheck, { "minutes": 5 });
+      currentTime < newTime => true | false
+    }
+    
+    //this function returns true if points were already earned with this description in the last five minutes for this person
+    alreadyEarned = function(scoreTracker, descr) {
+      currentTime = time:now();
+      //get all this person's points
+      pointsArr = tracker:getPointsArr(scoreTracker);
+      
+      //find the most recent point event that matches this description
+      //in this case, the left most items in the array are older, so we want to iterate from left to right and return whatever we saw last
+      mostRecentPointsEvent = pointsArr.reduce(function(counter, current) {
+        (current{"descr"} == descr) => current | counter
+      }, null);
+      mostRecentPointsEvent == null => false | checkTimestamps(currentTime, mostRecentPointsEvent{"timestamp"})
+    }
+    
+    DID_Policy = {
+        "name": "only allow score wrappper events",
+        "event": {
+            "allow": [
+                { "domain": "score_wrapper" }
+            ]
+        }
+    }
+  }
+  
+  rule init {
+    select when wrangler ruleset_installed where rids >< meta:rid
+    every{
+      engine:newPolicy(DID_Policy) setting(registered_policy)
+      engine:newChannel(name="scoreWrapper", type="scoreEvents", policy_id = registered_policy{"id"})
+    }
+  }
+  
+  rule addPoints {
+    select when score_wrapper new_points
+    pre {
+      pointsAlreadyEarned = alreadyEarned(tracker:getScoreTracker(), event:attr("descr"))
+    }
+    if not pointsAlreadyEarned then
+      noop()
+    fired {
+      raise score event "new_points"
+        attributes event:attrs
+    } else {
+      raise score_wrapper event "already_earned"
+        attributes event:attrs
+    }
+  }
+  
+  rule informOfCheating {
+    select when score_wrapper already_earned
+    send_directive("Already Earned", {
+      "descr": event:attr("descr"),
+      "points": event:attr("points")
+    })
+  }
+  
+  rule createCookie {
+    select when score_wrapper new_participant
+    always {
+      raise score event "new_participant"
+        attributes event:attrs
+    }
+  }
+  
+  rule recoverCookie {
+    select when score_wrapper recovery_needed
+    always {
+      raise score event "recovery_needed"
+        attributes event:attrs
+    }
+  }
+  
+}
