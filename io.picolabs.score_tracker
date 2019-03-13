@@ -120,7 +120,7 @@ ruleset io.picolabs.score_tracker {
   */
   
   rule init {
-    select when wrangler ruleset_installed where rids >< meta:rid
+    select when wrangler ruleset_added where rids >< meta:rid
     every{
       engine:newPolicy(DID_Policy) setting(registered_policy)
       engine:newChannel(name="scoreTracker", type="scoreEvents", policy_id = registered_policy{"id"})
