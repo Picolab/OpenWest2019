@@ -2,7 +2,7 @@ ruleset io.picolabs.score_tracker {
   meta {
     use module io.picolabs.cookies alias cookies
     shares __testing, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr, getRank, currentStanding
-    provides totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr
+    provides totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr, currentStanding
   }
   global {
     __testing = { "queries":
