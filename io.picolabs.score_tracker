@@ -1,7 +1,7 @@
 ruleset io.picolabs.score_tracker {
   meta {
     use module io.picolabs.cookies alias cookies
-    shares __testing, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr
+    shares __testing, totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr, getRank, currentStanding
     provides totalPoints, getScores, nameTaken, cookieFromRecoveryCode, infoFromName, currentRanks, nameFromScoreTracker, getScoreTracker, getPointsArr
   }
   global {
@@ -9,6 +9,8 @@ ruleset io.picolabs.score_tracker {
       [ { "name": "__testing" },
       { "name": "getScores" },
       { "name": "currentRanks" },
+      { "name": "getRank", "args": ["scoreTracker"] },
+      { "name": "currentStanding", "args": ["scoreTracker"] },
       { "name": "totalPoints", "args": ["scoreTracker"] },
       {"name": "getPointsArr", "args": ["scoreTracker"] },
       { "name": "nameFromScoreTracker", "args": ["scoreTracker"] },
@@ -20,6 +22,10 @@ ruleset io.picolabs.score_tracker {
       , { "domain": "score", "type": "new_participant", "attrs": ["first", "last", "phoneNum"] },
       { "domain": "score", "type": "recovery_needed", "attrs": ["recoveryCode", "first", "last"] }
       ]
+    }
+    
+    currentStanding = function(scoreTracker) {
+      nameFromScoreTracker(scoreTracker).put(getRank(scoreTracker)).put("points", totalPoints(scoreTracker));
     }
     
     getScores = function() {
@@ -41,6 +47,17 @@ ruleset io.picolabs.score_tracker {
         a{"points"} < b {"points"} => 1 |
           a{"points"} == b {"points"} => 0 | -1
       })
+    }
+    
+    getRank = function(scoreTracker) {
+      name = nameFromScoreTracker(scoreTracker);
+      ranks = currentRanks();
+      map = name.put("points", totalPoints(scoreTracker));
+      indexInRanks = ranks.index(map);
+      peersArr = ranks.filter(function(x) { x{"points"} == map{"points"} });
+      indexInPeers = peersArr.index(map);
+      rank = (indexInRanks - indexInPeers) + 1;
+      peersArr.length() > 1 => { "tied" : true, "rank" : rank } | { "tied" : false, "rank" : rank }
     }
     
     totalPoints = function(scoreTracker) {
