@@ -1,7 +1,7 @@
 ruleset io.picolabs.score_wrapper {
   meta {
     use module io.picolabs.score_tracker alias tracker
-    shares __testing, alreadyEarned
+    shares __testing, alreadyEarned, currentStanding
   }
   global {
     __testing = { "queries":
@@ -31,6 +31,10 @@ ruleset io.picolabs.score_wrapper {
         (current{"descr"} == descr) => current | counter
       }, null);
       mostRecentPointsEvent == null => false | checkTimestamps(currentTime, mostRecentPointsEvent{"timestamp"})
+    }
+    
+    currentStanding = function(scoreTracker) {
+      tracker:currentStanding(scoreTracker)
     }
     
     DID_Policy = {
