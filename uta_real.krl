@@ -201,7 +201,7 @@ ruleset uta_real {
     select when wrangler ruleset_added where rids >< meta:rid
     every{
       engine:newPolicy(DID_Policy) setting(registered_policy)
-      engine:newChannel(name="scoreTracker", type="scoreEvents", policy_id = registered_policy{"id"})
+      engine:newChannel(name="uta", type="uta", policy_id = registered_policy{"id"})
     }
   }
   
