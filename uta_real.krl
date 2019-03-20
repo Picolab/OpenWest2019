@@ -185,7 +185,24 @@ ruleset uta_real {
       ent:cached
     }
     
+    DID_Policy = {
+        "name": "only allow uta events",
+        "event": {
+            "allow": [
+                { "domain": "uta", "type": "get_times"}
+            ]
+        }
+    }
     
+    
+  }
+  
+  rule init {
+    select when wrangler ruleset_added where rids >< meta:rid
+    every{
+      engine:newPolicy(DID_Policy) setting(registered_policy)
+      engine:newChannel(name="scoreTracker", type="scoreEvents", policy_id = registered_policy{"id"})
+    }
   }
   
   
