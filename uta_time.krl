@@ -71,7 +71,7 @@ ruleset uta_time {
       end_day = end_date.substr(6,2).as("Number");
       end_number = end_year * 365 + end_month * 31 + end_day;
       
-      date = time:strftime(time:add(time:now(), { "hours" : -7 }),"%F");
+      date = time:strftime(time:add(time:now(), { "hours" : -6 }),"%F");
       year = date.substr(0,4).as("Number");
       month = date.substr(5,2).as("Number");
       day = date.substr(8,2).as("Number");
@@ -82,7 +82,7 @@ ruleset uta_time {
     
     dayOfWeek = function() {
       day_array = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-      date = time:strftime(time:add(time:now(), { "hours" : -7 }),"%F");
+      date = time:strftime(time:add(time:now(), { "hours" : -6 }),"%F");
       century = date.substr(0,2).as("Number");
       m = date.substr(5,2).as("Number");
       decade = ((m < 3) => (date.substr(2,2).as("Number") - 1) | (date.substr(2,2).as("Number")));
