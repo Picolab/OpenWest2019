@@ -166,7 +166,7 @@ ruleset uta_real {
     }
     
     exceptionType1 = function(id) {
-      today = time:strftime(time:add(time:now(), { "hours" : -7 }),"%F").extract(re#([0-9]+)#g).join("");
+      today = time:strftime(time:add(time:now(), { "hours" : -6 }),"%F").extract(re#([0-9]+)#g).join("");
       temp = ent:businfo{"calendar_dates"}.filter(function(x){
         (x{"service_id"} == id && x{"date"} == today)
       }).head();
@@ -174,7 +174,7 @@ ruleset uta_real {
     }
     
     exceptionType2 = function(id) {
-      today = time:strftime(time:add(time:now(), { "hours" : -7 }),"%F").extract(re#([0-9]+)#g).join("");
+      today = time:strftime(time:add(time:now(), { "hours" : -6 }),"%F").extract(re#([0-9]+)#g).join("");
       temp = ent:businfo{"calendar_dates"}.filter(function(x){
         (x{"service_id"} == id && x{"date"} == today)
       }).head();
