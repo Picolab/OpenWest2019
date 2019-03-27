@@ -37,12 +37,17 @@ ruleset io.picolabs.score_wrapper {
       tracker:currentStanding(scoreTracker)
     }
     
-    DID_Policy = {
+     DID_Policy = {
         "name": "only allow score wrappper events",
         "event": {
             "allow": [
                 { "domain": "score_wrapper" }
             ]
+        },
+        "query": {
+          "allow" : [
+            { "name": "currentStanding" }  
+          ]
         }
     }
   }
