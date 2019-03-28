@@ -1,6 +1,6 @@
 ruleset uta_real {
   meta {
-    shares __testing, loadDirectory, initializeFile, serviceValidToday, exceptionType1, viewFile, times, cached, getTimes
+    shares __testing, loadDirectory, initializeFile, serviceValidToday, exceptionType1, viewFile, times, cached, getTimes, businfo
     provides getTimes
     
     use module uta_time
@@ -9,6 +9,7 @@ ruleset uta_real {
     __testing = { "queries":
       [ { "name": "__testing" }
       , { "name": "loadDirectory" }
+      , { "name": "businfo" }
       , { "name": "viewFile", "args": [ "file" ] }
       , { "name": "serviceValidToday", "args": [ "id" ] }
       , { "name": "initializeFile", "args": [ "file" ] }
@@ -21,6 +22,10 @@ ruleset uta_real {
       , { "domain": "uta", "type": "delete_cache" }
       , { "domain": "delete", "type": "businfo" }
       ]
+    }
+    
+    businfo = function() {
+      ent:businfo
     }
     
     viewFile = function(file) {
@@ -61,13 +66,20 @@ ruleset uta_real {
         temp["short_name"] + " - " + temp["long_name"]
       });
       serviceIDList = getServiceIDs(routeList);
-      routesArray = filterServiceIDs([routeList, serviceIDList].pairwise(function(x,y){{}.put(x,y)}).head()).map(function(v,k) {
+      routeList.klog("Routes to be KLOGGED");
+      serviceIDList.klog("Service ID's to be KLOGGED");
+      pairwised = [routeList, serviceIDList].pairwise(function(x,y){{}.put(x,y)}).reduce(function(a,b){a.put(b)}).klog("PAIRWISED");
+      filterServiceIDs(pairwised).klog("FilteredPairwised");
+      
+      routesArray = filterServiceIDs(pairwised).map(function(v,k) {
         v.map(function(x) {
           times(code, k, x);
         }).head()
       });
+      routesArray.keys().klog("After filter");
+      
       all = uta.put("routes_array", routesArray);
-      newAll = [prettyRoutes, all["routes_array"].values()].pairwise(function(x,y){{}.put(x,y)}).head();
+      newAll = [prettyRoutes, all["routes_array"].values()].pairwise(function(x,y){{}.put(x,y)}).reduce(function(a,b){a.put(b)}).klog("PAIRWISED").head();
       all["routes_array"] = newAll;/*.map(function(x) {
         x.sort(uta_time:gtfsTimeCompare).filter(function(y) {
           uta_time:timeCompare(uta_time:timeConvert(y), time:now());
@@ -89,7 +101,7 @@ ruleset uta_real {
     getTimes2 = function(all) {
       all["routes_array"] = all["routes_array"].map(function(x) {
         x.sort(uta_time:gtfsTimeCompare).filter(function(y) {
-          uta_time:timeCompare(uta_time:timeConvert(y), time:add(time:now(), {"minutes": -30}));
+          uta_time:timeCompare(uta_time:timeConvert(y), time:add(time:now(), {"minutes": -3}));
         });
       }).map(function(x){ x.append(uta_time:minDiff(uta_time:timeConvert(x[0]))) });
       all
@@ -126,7 +138,7 @@ ruleset uta_real {
     }
     
     getRoutes = function(routesArray) {
-      routesArray.split(re#-#)
+      routesArray.split(re#-#);
     }
     
     getServiceIDs = function(routeList) {
