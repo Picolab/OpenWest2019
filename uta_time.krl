@@ -1,6 +1,6 @@
 ruleset uta_time {
   meta {
-    shares __testing, dayOfWeek, dayEquals
+    shares __testing, dayOfWeek, dayEquals, timeConvert
     provides timeConvert, timeCompare, gtfsTimeCompare, stampConvert, minDiff, dateCompare, dayOfWeek, dayEquals
     
     use module uta_math alias math
@@ -10,6 +10,7 @@ ruleset uta_time {
       [ { "name": "__testing" }
       , { "name": "dayOfWeek" }
       , { "name": "dayEquals" }
+      , { "name": "timeConvert" }
       //, { "name": "entry", "args": [ "key" ] }
       ] , "events":
       [ //{ "domain": "d1", "type": "t1" }
@@ -17,10 +18,10 @@ ruleset uta_time {
       ]
     }
     
-    timeConvert = function(tString = "10:02:12") {
+    timeConvert = function(tString = "13:28:12") {
       wocol = tString.extract(re#[0-9]#g).join("") + "Z";
       
-      toRet = time:add((wocol.length() == 6) => "0"+wocol | wocol, { "hours" : 7 });
+      toRet =time:add((wocol.length() == 6) => "0"+wocol | wocol, { "hours" : 6 });
       
       toRet;
     }
